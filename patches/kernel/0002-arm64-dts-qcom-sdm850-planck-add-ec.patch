@@ -1,0 +1,92 @@
+--- a/arch/arm64/boot/dts/qcom/sdm850-huawei-matebook-e-2019.dts
++++ b/arch/arm64/boot/dts/qcom/sdm850-huawei-matebook-e-2019.dts
+@@ -503,7 +503,52 @@
+ };
+ 
+ &i2c7 {
+-	/* ec@0x76 */
++	status = "okay";
++	clock-frequency = <400000>;
++
++	embedded-controller@76 {
++		compatible = "huawei,planck-ec";
++		reg = <0x76>;
++
++		interrupts-extended = <&tlmm 40 IRQ_TYPE_LEVEL_LOW>;
++
++		pinctrl-0 = <&ec_int_default>;
++		pinctrl-names = "default";
++
++		connector {
++			compatible = "usb-c-connector";
++			power-role = "dual";
++			data-role = "host";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port@0 {
++					reg = <0>;
++
++					ucsi0_hs_in: endpoint {
++						remote-endpoint = <&usb_1_dwc3_hs>;
++					};
++				};
++
++				port@1 {
++					reg = <1>;
++
++					ucsi0_ss_in: endpoint {
++						remote-endpoint = <&usb_1_qmpphy_out>;
++					};
++				};
++
++				port@2 {
++					reg = <2>;
++
++					ucsi0_sbu: endpoint {
++					};
++				};
++			};
++		};
++	};
+ };
+ 
+ &i2c10 {
+@@ -770,6 +815,13 @@
+ 		bias-pull-up;
+ 	};
+ 
++	ec_int_default: ec-int-default-state {
++		pins = "gpio40";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
+ 	mode_pin_active: mode-pin-state {
+ 		pins = "gpio79";
+ 		function = "gpio";
+@@ -856,6 +908,10 @@
+ 	dr_mode = "host";
+ };
+ 
++&usb_1_dwc3_hs {
++	remote-endpoint = <&ucsi0_hs_in>;
++};
++
+ &usb_1_hsphy {
+ 	vdd-supply = <&vdda_usb1_ss_core>;
+ 	vdda-pll-supply = <&vdda_qusb_hs0_1p8>;
+@@ -876,6 +932,10 @@
+ 	status = "okay";
+ };
+ 
++&usb_1_qmpphy_out {
++	remote-endpoint = <&ucsi0_ss_in>;
++};
++
+ &usb_2 {
+ 	status = "okay";
+ };

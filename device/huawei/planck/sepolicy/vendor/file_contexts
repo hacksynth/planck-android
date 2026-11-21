@@ -1,0 +1,15 @@
+/dev/qcom_rmtfs_mem[0-9]* u:object_r:rmtfs_device:s0
+/sys/devices/platform/soc@0/[0-9a-f]+\.memory/rmtfs u:object_r:sysfs_rmtfs:s0
+
+/data/vendor/tmp(/.*)? u:object_r:tqftpserv_vendor_data_file:s0
+/data/vendor/readwrite(/.*)? u:object_r:tqftpserv_vendor_data_file:s0
+/data/vendor/readonly(/.*)? u:object_r:tqftpserv_vendor_data_file:s0
+
+/vendor/bin/pd-mapper u:object_r:pd_mapper_exec:s0
+/vendor/bin/qrtr-cfg u:object_r:qrtr_exec:s0
+/vendor/bin/qrtr-ns u:object_r:qrtr_exec:s0
+/vendor/bin/rmtfs u:object_r:rmtfs_exec:s0
+/vendor/bin/tqftpserv u:object_r:tqftpserv_exec:s0
+/vendor/bin/hw/android\.hardware\.light-service\.planck u:object_r:hal_light_default_exec:s0
+
+

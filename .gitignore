@@ -1,0 +1,25 @@
+/out/
+/.work/
+/prebuilts/
+
+# Kernel and device images are build outputs, not source.
+/device/huawei/planck/prebuilt-boot/Image
+/device/huawei/planck/prebuilt-boot/vmlinuz.efi
+/device/huawei/planck/prebuilt-boot/dtb/*.dtb
+/device/huawei/planck/prebuilt-boot/modules/*.ko
+
+# Firmware is device-specific and may not be redistributable.
+/device/huawei/planck/firmware/**/*
+!/device/huawei/planck/firmware/README.md
+!/device/huawei/planck/firmware/.gitkeep
+
+*.img
+*.iso
+*.zip
+*.tar
+*.tar.gz
+*.tar.zst
+*.log
+*.swp
+.DS_Store
+

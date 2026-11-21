@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest version="1.0" type="device" target-level="202504">
+    <!-- HAL VINTF fragments are supplied by the AOSP/Lineage modules listed in device.mk. -->
+</manifest>
+

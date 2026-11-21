@@ -1,0 +1,29 @@
+cc_binary {
+    name: "android.hardware.light-service.planck",
+    relative_install_path: "hw",
+    vendor: true,
+    overrides: ["android.hardware.lights-service.example"],
+    srcs: ["Lights.cpp"],
+    init_rc: ["android.hardware.light-service.planck.rc"],
+    vintf_fragment_modules: ["android.hardware.light-service.planck.xml"],
+    stl: "c++_static",
+    shared_libs: [
+        "libbinder_ndk",
+        "liblog",
+    ],
+    static_libs: [
+        "android.hardware.light-V2-ndk",
+        "libbase",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}
+
+vintf_fragment {
+    name: "android.hardware.light-service.planck.xml",
+    src: "android.hardware.light-service.planck.xml",
+    vendor: true,
+}
+

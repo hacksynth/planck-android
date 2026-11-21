@@ -1,0 +1,25 @@
+diff --git a/arch/arm64/boot/dts/qcom/sdm850-huawei-planck-android.dts b/arch/arm64/boot/dts/qcom/sdm850-huawei-planck-android.dts
+new file mode 100644
+index 000000000..5c4856545
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm850-huawei-planck-android.dts
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: BSD-3-Clause
++
++#include "sdm850-huawei-matebook-e-2019.dts"
++
++&usb_1_dwc3 {
++	dr_mode = "peripheral";
++};
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index 1a81ea25a..fbc6d6472 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -333,5 +333,6 @@ dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-xiaomi-beryllium-tianma.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-xiaomi-polaris.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-shift-axolotl.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sdm850-huawei-matebook-e-2019.dtb
++dtb-$(CONFIG_ARCH_QCOM)	+= sdm850-huawei-planck-android.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sdm850-lenovo-yoga-c630.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sdm850-samsung-w737.dtb
+

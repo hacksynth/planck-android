@@ -1,0 +1,11 @@
+/dev/dri/renderD* 0666 system graphics
+/dev/dri/card* 0660 system graphics
+/dev/video* 0660 media camera
+/dev/media* 0660 media camera
+/dev/v4l-subdev* 0660 media camera
+/dev/fastrpc-adsp 0660 system system
+/dev/fastrpc-cdsp 0660 system system
+/dev/fastrpc-slpi 0660 system system
+/sys/class/leds/white:camera-indicator/brightness 0664 root camera
+/sys/class/backlight/*/brightness 0664 system system
+

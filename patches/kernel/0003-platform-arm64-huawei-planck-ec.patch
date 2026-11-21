@@ -1,0 +1,445 @@
+diff --git a/drivers/platform/arm64/Kconfig b/drivers/platform/arm64/Kconfig
+index e32e01b2a..00e4094e7 100644
+--- a/drivers/platform/arm64/Kconfig
++++ b/drivers/platform/arm64/Kconfig
+@@ -54,6 +54,21 @@ config EC_HUAWEI_GAOKUN
+ 
+ 	  Say M or Y here to include this support.
+ 
++config EC_HUAWEI_PLANCK
++	tristate "Huawei MateBook E (2019) Embedded Controller driver"
++	depends on ARCH_QCOM || COMPILE_TEST
++	depends on I2C
++	depends on INPUT
++	depends on BACKLIGHT_CLASS_DEVICE
++	select AUXILIARY_BUS
++	help
++	  Driver for the Embedded Controller in the Qualcomm Snapdragon-based
++	  Huawei MateBook E (2019) tablet. It provides lid state, panel
++	  backlight control and the transport used by the battery and UCSI
++	  auxiliary drivers.
++
++	  Say M or Y here to include this support.
++
+ config EC_LENOVO_YOGA_C630
+ 	tristate "Lenovo Yoga C630 Embedded Controller driver"
+ 	depends on ARCH_QCOM || COMPILE_TEST
+diff --git a/drivers/platform/arm64/Makefile b/drivers/platform/arm64/Makefile
+index 7681be4a4..0d1a92c54 100644
+--- a/drivers/platform/arm64/Makefile
++++ b/drivers/platform/arm64/Makefile
+@@ -7,6 +7,7 @@
+ 
+ obj-$(CONFIG_EC_ACER_ASPIRE1)	+= acer-aspire1-ec.o
+ obj-$(CONFIG_EC_HUAWEI_GAOKUN)	+= huawei-gaokun-ec.o
++obj-$(CONFIG_EC_HUAWEI_PLANCK)	+= huawei-planck-ec.o
+ obj-$(CONFIG_EC_LENOVO_YOGA_C630) += lenovo-yoga-c630.o
+ obj-$(CONFIG_EC_LENOVO_THINKPAD_T14S) += lenovo-thinkpad-t14s.o
+ obj-$(CONFIG_EC_QCOM_HAMOA) += qcom-hamoa-ec.o
+diff --git a/drivers/platform/arm64/huawei-planck-ec.c b/drivers/platform/arm64/huawei-planck-ec.c
+new file mode 100644
+index 000000000..9efdc06a0
+--- /dev/null
++++ b/drivers/platform/arm64/huawei-planck-ec.c
+@@ -0,0 +1,366 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright (C) 2024-2025
++ *
++ * NewWheat <newwheatzjz@outlook.com>
++ */
++#include <linux/auxiliary_bus.h>
++#include <linux/backlight.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/i2c.h>
++#include <linux/input.h>
++#include <linux/irqreturn.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/notifier.h>
++#include <linux/platform_data/huawei-planck-ec.h>
++#include <linux/string.h>
++
++#define PLANCK_EC_READ_EVENT_REG 0x31
++#define PLANCK_EC_READ_COMMON_REQ_REG 0x21
++#define PLANCK_EC_READ_COMMON_RESP_REG 0x21
++#define PLANCK_EC_READ_UCSI_REQ_REG 0xa2
++#define PLANCK_EC_READ_UCSI_RESP_REG 0xa0
++
++#define PLANCK_EC_WRITE_BACKLIGHT_REG 0x20
++#define PLANCK_EC_WRITE_UCSI_REG 0xa1
++
++#define PLANCK_EC_WRITE_BACKLIGHT_CMD 0xff
++
++#define PLANCK_EC_BACKLIGHT_DEFAULT 127
++#define PLANCK_EC_BACKLIGHT_MAX 255
++#define PLANCK_EC_TRANSFER_DELAY_MS 13
++#define PLANCK_EC_MAX_BLOCK_SIZE 50
++
++#define PLANCK_EC_EVENT_LID_OPEN 0x20
++#define PLANCK_EC_EVENT_LID_CLOSE 0x21
++
++struct planck_ec {
++	struct i2c_client *client;
++	struct mutex lock;
++	struct blocking_notifier_head notifier_list;
++	struct backlight_device *bl;
++	struct input_dev *idev;
++};
++
++static int planck_ec_read_event(struct planck_ec *ec, u8 *data)
++{
++	struct i2c_client *client = ec->client;
++	int ret;
++
++	guard(mutex)
++		(&ec->lock);
++
++	ret = i2c_smbus_read_byte_data(client, PLANCK_EC_READ_EVENT_REG);
++	if (ret < 0) {
++		dev_err(&client->dev, "failed to read EC event: %pe\n",
++			ERR_PTR(ret));
++		return ret;
++	}
++
++	*data = ret;
++	return 0;
++}
++
++static int planck_ec_read_common(struct planck_ec *ec, u8 cmd, u8 *data,
++				 u8 data_len)
++{
++	struct i2c_client *client = ec->client;
++	int ret;
++
++	guard(mutex)
++		(&ec->lock);
++
++	ret = i2c_smbus_write_byte_data(client, PLANCK_EC_READ_COMMON_REQ_REG,
++					cmd);
++	if (ret < 0) {
++		dev_err(&client->dev,
++			"failed to write common command 0x%02x: %pe\n", cmd,
++			ERR_PTR(ret));
++		return ret;
++	}
++
++	ret = i2c_smbus_read_i2c_block_data(
++		client, PLANCK_EC_READ_COMMON_RESP_REG, data_len, data);
++	if (ret < 0) {
++		dev_err(&client->dev,
++			"failed to read common response for 0x%02x: %pe\n", cmd,
++			ERR_PTR(ret));
++		return ret;
++	}
++
++	return ret == data_len ? 0 : -EIO;
++}
++
++static int planck_ec_read_ucsi(struct planck_ec *ec, u8 cmd, u8 *data,
++			       u8 data_len)
++{
++	struct i2c_client *client = ec->client;
++	int ret;
++
++	guard(mutex)
++		(&ec->lock);
++
++	ret = i2c_smbus_write_byte_data(client, PLANCK_EC_READ_UCSI_REQ_REG,
++					cmd);
++	if (ret < 0) {
++		dev_err(&client->dev,
++			"failed to write UCSI command 0x%02x: %pe\n", cmd,
++			ERR_PTR(ret));
++		return ret;
++	}
++
++	ret = i2c_smbus_read_i2c_block_data(
++		client, PLANCK_EC_READ_UCSI_RESP_REG, data_len, data);
++	if (ret < 0) {
++		dev_err(&client->dev,
++			"failed to read UCSI response for 0x%02x: %pe\n", cmd,
++			ERR_PTR(ret));
++		return ret;
++	}
++
++	return ret == data_len ? 0 : -EIO;
++}
++
++static int planck_ec_write_block(struct planck_ec *ec, u8 reg, const u8 *data,
++				 u8 data_len)
++{
++	struct i2c_client *client = ec->client;
++	u8 buf[PLANCK_EC_MAX_BLOCK_SIZE + 1];
++	struct i2c_msg msg;
++	int ret;
++
++	if (data_len > PLANCK_EC_MAX_BLOCK_SIZE)
++		return -EINVAL;
++
++	buf[0] = reg;
++	memcpy(&buf[1], data, data_len);
++	msg = (struct i2c_msg){
++		.addr = client->addr,
++		.flags = client->flags & I2C_M_TEN,
++		.len = data_len + 1,
++		.buf = buf,
++	};
++
++	guard(mutex)
++		(&ec->lock);
++
++	ret = i2c_transfer(client->adapter, &msg, 1);
++	if (ret != 1) {
++		dev_err(&client->dev, "failed to write EC block 0x%02x: %d\n",
++			reg, ret);
++		return ret < 0 ? ret : -EIO;
++	}
++
++	return 0;
++}
++
++static int planck_ec_write_backlight(struct planck_ec *ec, u8 *data)
++{
++	u8 brightness = *data;
++	u8 payload[] = { PLANCK_EC_WRITE_BACKLIGHT_CMD, brightness };
++
++	return planck_ec_write_block(ec, PLANCK_EC_WRITE_BACKLIGHT_REG, payload,
++				     sizeof(payload));
++}
++
++/* Common APIs */
++
++int planck_ec_transfer(struct planck_ec *ec, u8 cmd, u8 *data, u8 data_len,
++		       enum planck_ec_transfer_operation op)
++{
++	int ret = 0;
++
++	/* The ACPI implementation and vendor driver both delay EC transfers. */
++	msleep(PLANCK_EC_TRANSFER_DELAY_MS);
++
++	switch (op) {
++	case PLANCK_EC_READ_EVENT:
++		ret = planck_ec_read_event(ec, data);
++		break;
++
++	case PLANCK_EC_READ_COMMON:
++		ret = planck_ec_read_common(ec, cmd, data, data_len);
++		break;
++
++	case PLANCK_EC_READ_UCSI:
++		ret = planck_ec_read_ucsi(ec, cmd, data, data_len);
++		break;
++
++	case PLANCK_EC_WRITE_BACKLIGHT:
++		ret = planck_ec_write_backlight(ec, data);
++		break;
++
++	case PLANCK_EC_WRITE_UCSI:
++		ret = planck_ec_write_block(ec, PLANCK_EC_WRITE_UCSI_REG, data,
++					    data_len);
++		break;
++
++	default:
++		return -EINVAL;
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(planck_ec_transfer);
++
++int planck_ec_register_notify(struct planck_ec *ec, struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&ec->notifier_list, nb);
++}
++EXPORT_SYMBOL_GPL(planck_ec_register_notify);
++
++void planck_ec_unregister_notify(struct planck_ec *ec,
++				 struct notifier_block *nb)
++{
++	blocking_notifier_chain_unregister(&ec->notifier_list, nb);
++}
++EXPORT_SYMBOL_GPL(planck_ec_unregister_notify);
++
++/* Backlight */
++
++static int planck_ec_backlight_update_status(struct backlight_device *bl)
++{
++	struct planck_ec *ec = bl_get_data(bl);
++	u8 brightness = backlight_get_brightness(bl);
++
++	return planck_ec_transfer(ec, 0, &brightness, sizeof(brightness),
++				  PLANCK_EC_WRITE_BACKLIGHT);
++}
++
++static const struct backlight_ops planck_ec_backlight_ops = {
++	.options = BL_CORE_SUSPENDRESUME,
++	.update_status = planck_ec_backlight_update_status,
++};
++
++static const struct backlight_properties planck_ec_backlight_props = {
++	.type = BACKLIGHT_RAW,
++	.scale = BACKLIGHT_SCALE_LINEAR,
++	.brightness = PLANCK_EC_BACKLIGHT_DEFAULT,
++	.max_brightness = PLANCK_EC_BACKLIGHT_MAX,
++};
++
++/* IRQ Handler */
++
++static irqreturn_t planck_ec_irq_handler(int irq, void *data)
++{
++	struct planck_ec *ec = data;
++	u8 id;
++	int ret;
++
++	ret = planck_ec_transfer(ec, 0, &id, sizeof(id), PLANCK_EC_READ_EVENT);
++	if (ret) {
++		dev_err_ratelimited(&ec->client->dev,
++				    "failed to read EC event: %pe\n",
++				    ERR_PTR(ret));
++		return IRQ_HANDLED;
++	}
++
++	switch (id) {
++	case PLANCK_EC_EVENT_LID_OPEN:
++		input_report_switch(ec->idev, SW_LID, 0);
++		input_sync(ec->idev);
++		break;
++
++	case PLANCK_EC_EVENT_LID_CLOSE:
++		input_report_switch(ec->idev, SW_LID, 1);
++		input_sync(ec->idev);
++		break;
++
++	default:
++		blocking_notifier_call_chain(&ec->notifier_list, id, ec);
++	}
++
++	return IRQ_HANDLED;
++}
++
++static int planck_aux_init(struct device *parent, const char *name,
++			   struct planck_ec *ec)
++{
++	struct auxiliary_device *adev;
++
++	adev = devm_auxiliary_device_create(parent, name, ec);
++	if (!adev)
++		return -ENODEV;
++
++	return 0;
++}
++
++static int planck_ec_probe(struct i2c_client *client)
++{
++	struct device *dev = &client->dev;
++	struct planck_ec *ec;
++	int ret;
++
++	ec = devm_kzalloc(dev, sizeof(*ec), GFP_KERNEL);
++	if (!ec)
++		return -ENOMEM;
++
++	mutex_init(&ec->lock);
++	ec->client = client;
++	BLOCKING_INIT_NOTIFIER_HEAD(&ec->notifier_list);
++
++	ec->bl = devm_backlight_device_register(
++		&client->dev, "planck-ec-backlight", &client->dev, ec,
++		&planck_ec_backlight_ops, &planck_ec_backlight_props);
++
++	if (IS_ERR(ec->bl))
++		return dev_err_probe(dev, PTR_ERR(ec->bl),
++				     "Failed to register backlight device\n");
++
++	backlight_update_status(ec->bl);
++
++	ec->idev = devm_input_allocate_device(dev);
++	if (!ec->idev)
++		return -ENOMEM;
++
++	ec->idev->name = "planck-ec-lid";
++	ec->idev->phys = "planck-ec/input0";
++	input_set_capability(ec->idev, EV_SW, SW_LID);
++
++	ret = input_register_device(ec->idev);
++	if (ret < 0)
++		return dev_err_probe(dev, ret,
++				     "Failed to register input device\n");
++
++	ret = devm_request_threaded_irq(dev, client->irq, NULL,
++					planck_ec_irq_handler, IRQF_ONESHOT,
++					dev_name(dev), ec);
++	if (ret < 0)
++		return dev_err_probe(dev, ret, "Failed to request irq\n");
++
++	ret = planck_aux_init(dev, PLANCK_DEV_PSY, ec);
++	if (ret < 0)
++		return ret;
++
++	return planck_aux_init(dev, PLANCK_DEV_UCSI, ec);
++}
++
++static const struct i2c_device_id planck_ec_id[] = { {
++							     "huawei-planck-ec",
++						     },
++						     {} };
++MODULE_DEVICE_TABLE(i2c, planck_ec_id);
++
++static const struct of_device_id planck_ec_of_match[] = {
++	{
++		.compatible = "huawei,planck-ec",
++	},
++	{}
++};
++MODULE_DEVICE_TABLE(of, planck_ec_of_match);
++
++static struct i2c_driver planck_ec_driver = {
++	.driver = {
++		.name = "huawei-planck-ec",
++		.of_match_table = planck_ec_of_match,
++	},
++	.probe = planck_ec_probe,
++	.id_table = planck_ec_id,
++};
++module_i2c_driver(planck_ec_driver);
++
++MODULE_DESCRIPTION("HUAWEI MateBook E (2019) embedded controller");
++MODULE_AUTHOR("NewWheat <newwheatzjz@outlook.com>");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/platform_data/huawei-planck-ec.h b/include/linux/platform_data/huawei-planck-ec.h
+new file mode 100644
+index 000000000..7c86abbc0
+--- /dev/null
++++ b/include/linux/platform_data/huawei-planck-ec.h
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef _LINUX_PLATFORM_DATA_HUAWEI_PLANCK_EC_H
++#define _LINUX_PLATFORM_DATA_HUAWEI_PLANCK_EC_H
++
++#include <linux/types.h>
++
++struct planck_ec;
++struct notifier_block;
++
++#define PLANCK_MOD_NAME "huawei_planck_ec"
++#define PLANCK_DEV_PSY "psy"
++#define PLANCK_DEV_UCSI "ucsi"
++
++enum planck_ec_transfer_operation {
++	PLANCK_EC_READ_EVENT,
++	PLANCK_EC_READ_COMMON,
++	PLANCK_EC_READ_UCSI,
++	PLANCK_EC_WRITE_BACKLIGHT,
++	PLANCK_EC_WRITE_UCSI
++};
++
++int planck_ec_transfer(struct planck_ec *ec, u8 cmd, u8 *data, u8 data_len,
++		       enum planck_ec_transfer_operation op);
++
++int planck_ec_register_notify(struct planck_ec *ec, struct notifier_block *nb);
++void planck_ec_unregister_notify(struct planck_ec *ec,
++				 struct notifier_block *nb);
++
++#endif /* _LINUX_PLATFORM_DATA_HUAWEI_PLANCK_EC_H */

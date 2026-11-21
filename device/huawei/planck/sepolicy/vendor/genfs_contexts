@@ -1,0 +1,4 @@
+# AOSP provides hal_light_default access to sysfs_leds. Label the backlight
+# class node so the Planck lights HAL can enumerate and write brightness.
+genfscon sysfs /class/backlight u:object_r:sysfs_leds:s0
+
