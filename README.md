@@ -44,7 +44,7 @@
 ## 快速开始
 
 ```sh
-# 1. 同步 LineageOS 23.2
+# 1. 通过 BFSU 镜像同步 LineageOS 23.2（默认并发为 4）
 bash scripts/bootstrap.sh
 
 # 2. 从现有 Linux 安装或 Windows 驱动资料导入本机固件
@@ -68,6 +68,10 @@ bash scripts/build-uki.sh \
   --output out/esp/EFI/BOOT/BOOTAA64.EFI
 bash scripts/package-esp.sh --product-out .work/lineage/out/target/product/planck
 ```
+
+同步脚本默认使用北外开源软件镜像站的 LineageOS 与 AOSP 仓库。可通过
+`LINEAGE_MANIFEST_URL`、`REPO_URL` 和 `JOBS` 覆盖默认值；请遵守镜像站
+对并发数不超过 4 的要求。
 
 安装步骤和分区保护见 [docs/INSTALL.md](docs/INSTALL.md)。在确认设备、备份和回滚路径前，不要执行任何写盘命令。
 
