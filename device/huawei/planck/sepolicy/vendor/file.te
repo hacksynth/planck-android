@@ -1,4 +1,5 @@
 type sysfs_rmtfs, fs_type, sysfs_type;
+type sysfs_remoteproc, fs_type, sysfs_type;
 type rmtfs_device, dev_type;
 type tqftpserv_vendor_data_file, file_type, data_file_type, mlstrustedobject;
 

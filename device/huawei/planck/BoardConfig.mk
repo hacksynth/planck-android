@@ -49,6 +49,10 @@ BOARD_KERNEL_CMDLINE := \
     clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime
 
 # Single-slot dynamic partitions.
+#
+# Android 16 defaults AB_OTA_UPDATER to true when it is unset. This port has
+# no bootloader-managed slots, so opt out explicitly.
+AB_OTA_UPDATER := false
 BOARD_SUPER_PARTITION_SIZE := 8589934592
 BOARD_SUPER_PARTITION_GROUPS := planck_dynamic_partitions
 BOARD_PLANCK_DYNAMIC_PARTITIONS_PARTITION_LIST := system system_ext product vendor

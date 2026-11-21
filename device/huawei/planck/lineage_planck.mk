@@ -26,8 +26,8 @@ PRODUCT_USE_DYNAMIC_PARTITIONS := true
 PRODUCT_BUILD_SUPER_PARTITION := true
 
 # This port is intentionally single-slot until a UEFI slot manager and rollback
-# path have been validated on hardware.
-PRODUCT_BUILD_GENERIC_OTA_PACKAGE := true
+# path have been validated on hardware. Generic OTA packages currently require
+# AB_OTA_UPDATER, which is disabled in BoardConfig.mk.
 
 # Mainline kernels are newer than the latest known kernel FCM table.
 PRODUCT_OTA_ENFORCE_VINTF_KERNEL_REQUIREMENTS := false
