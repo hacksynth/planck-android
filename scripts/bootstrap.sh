@@ -53,13 +53,14 @@ configure_bfsu_manifest() {
     fi
 
     sed -i \
-        '/^[[:space:]]*<default[[:space:]]/ s#remote="github"#remote="lineage"#' \
+        '/^[[:space:]]*<default[[:space:]]/,/\/>/ s#remote="github"#remote="lineage"#' \
         "${manifest_file}"
 
     grep -Fq 'fetch="https://github.com/"' "${manifest_file}" &&
         grep -Fq 'fetch="https://mirrors.bfsu.edu.cn/git/lineageOS/"' "${manifest_file}" &&
         grep -Fq 'fetch="https://mirrors.bfsu.edu.cn/git/AOSP"' "${manifest_file}" &&
-        grep -Eq '<default[^>]+remote="lineage"' "${manifest_file}" ||
+        sed -n '/^[[:space:]]*<default[[:space:]]/,/\/>/p' "${manifest_file}" |
+            grep -Fq 'remote="lineage"' ||
         die "failed to configure the BFSU LineageOS/AOSP remotes"
 }
 
