@@ -86,21 +86,31 @@ install -m 0644 "${repo_root}/manifests/local_manifest_planck.xml" \
 
 device_path="${android_root}/device/huawei/planck"
 mkdir -p "${device_path%/*}"
-if [[ -e ${device_path} || -L ${device_path} ]]; then
+if mountpoint -q "${device_path}"; then
+    die "${device_path} is a mountpoint; unmount it before mirroring the device tree"
+fi
+if [[ -L ${device_path} ]]; then
     resolved=$(readlink -f "${device_path}" 2>/dev/null || true)
     [[ ${resolved} == "${repo_root}" ]] ||
-        die "${device_path} already exists and is not this checkout"
-else
-    ln -s "${repo_root}" "${device_path}"
+        die "${device_path} is a symlink to an unexpected path"
+    unlink "${device_path}"
+elif [[ -e ${device_path} && ! -d ${device_path} ]]; then
+    die "${device_path} exists and is not a directory"
 fi
+command -v rsync >/dev/null 2>&1 ||
+    die "rsync is required to mirror the device tree"
+mkdir -p "${device_path}"
+rsync -a --delete \
+    "${repo_root}/device/huawei/planck/" "${device_path}/"
 
 cat <<EOF
 
 LineageOS source: ${android_root}
-Device tree:      ${device_path} -> ${repo_root}
+Device tree:      ${device_path} (mirrored from ${repo_root})
 
 Next:
   cd ${android_root}
+  source ${repo_root}/scripts/planck-env.sh
   source build/envsetup.sh
   bash ${repo_root}/scripts/build-kernel.sh
   breakfast lineage_planck-bp4a-userdebug

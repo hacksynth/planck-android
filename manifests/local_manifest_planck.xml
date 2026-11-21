@@ -6,32 +6,7 @@
            name="device/linaro/dragonboard"
            remote="aosp" />
 
-  <!-- Qualcomm remote-processor userspace. These revisions match the older,
-       hardware-validated QRTR/QMI userspace used by the existing Planck Linux
-       port rather than unpinned upstream branches. -->
-  <project path="external/qrtr"
-           name="aospm/qrtr"
-           remote="github"
-           upstream="master"
-           clone-depth="1"
-           revision="29e36ae164389580a0f8ea7a7fdb728140ae978d" />
-  <project path="external/tqftpserv"
-           name="linux-msm/tqftpserv"
-           remote="github"
-           upstream="master"
-           clone-depth="1"
-           revision="eb4b9a04ff92d2753ededf32cc3b6ed287f6e29b" />
-  <project path="external/pd-mapper"
-           name="linux-msm/pd-mapper"
-           remote="github"
-           upstream="master"
-           clone-depth="1"
-           revision="5ecd2fe926aca7abfe40724177f63b942cff3947" />
-  <project path="external/rmtfs"
-           name="linux-msm/rmtfs"
-           remote="github"
-           upstream="master"
-           clone-depth="1"
-           revision="b30a3eb38f9af283f18dbd3c7755653efc52c094" />
+  <!-- Qualcomm remote-processor userspace comes from DragonBoard, which ships
+       the complete AOSP-compatible QRTR/QMI set including qrtr-ns. -->
 </manifest>
 

@@ -35,6 +35,8 @@
 ## 构建前提
 
 - 64 位 Linux 构建机，建议 32 GiB 内存以上。
+- 32 GiB 内存的机器建议配置至少 32 GiB Swap；Android 16 的 Soong
+  模块图分析可能超过 30 GiB 内存。
 - LineageOS 23.2 全量源码建议预留至少 400 GiB；内核与固件另需约 20 GiB。
 - `aarch64-linux-gnu-` 或可用的 LLVM/Clang 交叉工具链、`dtc`、`make`、`bc`、`bison`、`flex`、`python3`。
 - 生成 UKI 时需要支持 `--devicetree` 的 systemd `ukify`。
@@ -47,21 +49,24 @@
 # 1. 通过 BFSU 镜像同步 LineageOS 23.2（默认并发为 4）
 bash scripts/bootstrap.sh
 
-# 2. 从现有 Linux 安装或 Windows 驱动资料导入本机固件
+# 2. 加载 40 GiB 的共享 ccache 与源码路径
+source scripts/planck-env.sh
+
+# 3. 从现有 Linux 安装或 Windows 驱动资料导入本机固件
 bash scripts/import-firmware.sh --source /path/to/firmware-root
 
-# 3. 使用 LineageOS 提供的 Clang 构建 v7.3.5 Planck 内核与 DTB
+# 4. 使用 LineageOS 提供的 Clang 构建 v7.3.5 Planck 内核与 DTB
 #    需要构建全部外设模块时设置 PLANCK_BUILD_MODULES=1
 cd .work/lineage
 source build/envsetup.sh
 bash ../../scripts/build-kernel.sh
 
-# 4. 构建 LineageOS
+# 5. 构建 LineageOS
 breakfast lineage_planck-bp4a-userdebug
 m bacon superimage
 cd ../..
 
-# 5. 生成可直接由 UEFI 固件启动的 BOOTAA64.EFI，以及可选的 ESP 文件树
+# 6. 生成可直接由 UEFI 固件启动的 BOOTAA64.EFI，以及可选的 ESP 文件树
 bash scripts/build-uki.sh \
   --product-out .work/lineage/out/target/product/planck \
   --variant debug \

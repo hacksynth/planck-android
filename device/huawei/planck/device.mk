@@ -85,7 +85,9 @@ PRODUCT_PACKAGES += \
     com.android.hardware.gatekeeper.nonsecure
 
 # WCN3990 uses mainline ath10k and the AOSP nl80211 HAL.
-PRODUCT_SOONG_NAMESPACES += device/generic/goldfish
+PRODUCT_SOONG_NAMESPACES += \
+    device/generic/goldfish \
+    device/linaro/dragonboard
 PRODUCT_PACKAGES += \
     com.android.hardware.wifi \
     wpa_supplicant \
