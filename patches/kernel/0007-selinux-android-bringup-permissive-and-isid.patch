@@ -1,0 +1,147 @@
+diff --git a/security/selinux/selinuxfs.c b/security/selinux/selinuxfs.c
+index c7d914769..2764761a2 100644
+--- a/security/selinux/selinuxfs.c
++++ b/security/selinux/selinuxfs.c
+@@ -154,6 +154,10 @@ static ssize_t sel_write_enforce(struct file *file, const char __user *buf,
+ 		goto out;
+ 
+ 	new_value = !!scan_value;
++	if (new_value &&
++	    (strstr(saved_command_line, "androidboot.selinux=permissive") ||
++	     !strstr(saved_command_line, "enforcing=1")))
++		new_value = false;
+ 
+ 	old_value = enforcing_enabled();
+ 	if (new_value != old_value) {
+@@ -609,12 +613,20 @@ static ssize_t sel_write_context(struct file *file, char *buf, size_t size)
+ 		goto out;
+ 
+ 	length = security_context_to_sid(buf, size, &sid, GFP_KERNEL);
+-	if (length)
+-		goto out;
++	if (length) {
++		if (!enforcing_enabled())
++			length = security_context_to_sid_force(buf, size, &sid);
++		if (length)
++			goto out;
++	}
+ 
+ 	length = security_sid_to_context(sid, &canon, &len);
+-	if (length)
+-		goto out;
++	if (length) {
++		if (!enforcing_enabled())
++			length = security_sid_to_context_force(sid, &canon, &len);
++		if (length)
++			goto out;
++	}
+ 
+ 	length = -ERANGE;
+ 	if (len > SIMPLE_TRANSACTION_LIMIT) {
+@@ -810,19 +822,43 @@ static ssize_t sel_write_access(struct file *file, char *buf, size_t size)
+ 		goto out;
+ 
+ 	length = -EINVAL;
+-	if (sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3)
++	if (sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3) {
++		if (!enforcing_enabled())
++			goto allow_permissive;
+ 		goto out;
++	}
+ 
+ 	length = security_context_str_to_sid(scon, &ssid, GFP_KERNEL);
+-	if (length)
+-		goto out;
++	if (length) {
++		if (!enforcing_enabled())
++			length = security_context_to_sid_force(scon,
++							       strlen(scon),
++							       &ssid);
++		if (length) {
++			if (!enforcing_enabled())
++				goto allow_permissive;
++			goto out;
++		}
++	}
+ 
+ 	length = security_context_str_to_sid(tcon, &tsid, GFP_KERNEL);
+-	if (length)
+-		goto out;
++	if (length) {
++		if (!enforcing_enabled())
++			length = security_context_to_sid_force(tcon,
++							       strlen(tcon),
++							       &tsid);
++		if (length) {
++			if (!enforcing_enabled())
++				goto allow_permissive;
++			goto out;
++		}
++	}
+ 
+ 	security_compute_av_user(ssid, tsid, tclass, &avd);
++	if (!enforcing_enabled())
++		avd.flags |= AVD_FLAGS_PERMISSIVE;
+ 
++format_avd:
+ 	length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT,
+ 			  "%x %x %x %x %u %x",
+ 			  avd.allowed, 0xffffffff,
+@@ -832,6 +868,14 @@ static ssize_t sel_write_access(struct file *file, char *buf, size_t size)
+ 	kfree(tcon);
+ 	kfree(scon);
+ 	return length;
++
++allow_permissive:
++	avd.allowed = 0xffffffff;
++	avd.auditallow = 0;
++	avd.auditdeny = 0xffffffff;
++	avd.seqno = 0;
++	avd.flags = AVD_FLAGS_PERMISSIVE;
++	goto format_avd;
+ }
+ 
+ static ssize_t sel_write_create(struct file *file, char *buf, size_t size)
+diff --git a/security/selinux/ss/services.c b/security/selinux/ss/services.c
+index da77ad769..fab5679d1 100644
+--- a/security/selinux/ss/services.c
++++ b/security/selinux/ss/services.c
+@@ -1151,7 +1151,8 @@ void security_compute_av(u32 ssid,
+ 	}
+ 
+ 	/* permissive domain? */
+-	if (ebitmap_get_bit(&policydb->permissive_map, scontext->type))
++	if (!enforcing_enabled() ||
++	    ebitmap_get_bit(&policydb->permissive_map, scontext->type))
+ 		avd->flags |= AVD_FLAGS_PERMISSIVE;
+ 
+ 	/* neveraudit domain? */
+@@ -1216,7 +1217,8 @@ void security_compute_av_user(u32 ssid,
+ 	}
+ 
+ 	/* permissive domain? */
+-	if (ebitmap_get_bit(&policydb->permissive_map, scontext->type))
++	if (!enforcing_enabled() ||
++	    ebitmap_get_bit(&policydb->permissive_map, scontext->type))
+ 		avd->flags |= AVD_FLAGS_PERMISSIVE;
+ 
+ 	/* neveraudit domain? */
+diff --git a/security/selinux/ss/sidtab.c b/security/selinux/ss/sidtab.c
+index 118af0aa2..b33549664 100644
+--- a/security/selinux/ss/sidtab.c
++++ b/security/selinux/ss/sidtab.c
+@@ -103,11 +103,10 @@ int sidtab_set_initial(struct sidtab *s, u32 sid, struct context *context)
+ 	 * to avoid duplicate entries and long linked lists upon hash
+ 	 * collision.
+ 	 */
+-	if (!context_to_sid(s, context, hash)) {
+-		isid->entry.sid = sid;
+-		isid->entry.hash = hash;
++	isid->entry.sid = sid;
++	isid->entry.hash = hash;
++	if (!context_to_sid(s, context, hash))
+ 		hash_add(s->context_to_sid, &isid->entry.list, hash);
+-	}
+ 
+ 	return 0;
+ }

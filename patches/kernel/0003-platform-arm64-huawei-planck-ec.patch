@@ -41,7 +41,7 @@ new file mode 100644
 index 000000000..9efdc06a0
 --- /dev/null
 +++ b/drivers/platform/arm64/huawei-planck-ec.c
-@@ -0,0 +1,366 @@
+@@ -0,0 +1,356 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Copyright (C) 2024-2025
@@ -93,9 +93,6 @@ index 000000000..9efdc06a0
 +	struct i2c_client *client = ec->client;
 +	int ret;
 +
-+	guard(mutex)
-+		(&ec->lock);
-+
 +	ret = i2c_smbus_read_byte_data(client, PLANCK_EC_READ_EVENT_REG);
 +	if (ret < 0) {
 +		dev_err(&client->dev, "failed to read EC event: %pe\n",
@@ -112,9 +109,6 @@ index 000000000..9efdc06a0
 +{
 +	struct i2c_client *client = ec->client;
 +	int ret;
-+
-+	guard(mutex)
-+		(&ec->lock);
 +
 +	ret = i2c_smbus_write_byte_data(client, PLANCK_EC_READ_COMMON_REQ_REG,
 +					cmd);
@@ -142,9 +136,6 @@ index 000000000..9efdc06a0
 +{
 +	struct i2c_client *client = ec->client;
 +	int ret;
-+
-+	guard(mutex)
-+		(&ec->lock);
 +
 +	ret = i2c_smbus_write_byte_data(client, PLANCK_EC_READ_UCSI_REQ_REG,
 +					cmd);
@@ -187,9 +178,6 @@ index 000000000..9efdc06a0
 +		.buf = buf,
 +	};
 +
-+	guard(mutex)
-+		(&ec->lock);
-+
 +	ret = i2c_transfer(client->adapter, &msg, 1);
 +	if (ret != 1) {
 +		dev_err(&client->dev, "failed to write EC block 0x%02x: %d\n",
@@ -215,6 +203,8 @@ index 000000000..9efdc06a0
 +		       enum planck_ec_transfer_operation op)
 +{
 +	int ret = 0;
++
++	guard(mutex)(&ec->lock);
 +
 +	/* The ACPI implementation and vendor driver both delay EC transfers. */
 +	msleep(PLANCK_EC_TRANSFER_DELAY_MS);

@@ -26,8 +26,8 @@ HUAWEI MateBook E 2019 是 Windows on ARM 设备。它的启动链是 Qualcomm X
 
 1. Setup Utility 中可关闭 Secure Boot。
 2. 固件可以从 FAT32 ESP 执行未签名的 AArch64 UEFI 映像。
-3. 已备份 Windows、恢复镜像、BitLocker 恢复密钥和现有 ESP。
-4. 安装介质不是内部 UFS。分区脚本默认拒绝 `/dev/nvme*` 和 `/dev/mmcblk*`。
+3. 已备份 Windows、恢复镜像、BitLocker 恢复密钥、原始 GPT 分区表和现有 ESP。
+4. Android 分区（`misc`、`metadata`、`super`、`userdata`）部署在内部 UFS LUN 0（`soc@0/1d84000.ufshc`）上，切勿改动包含 XBL/UEFI/modem EFS 的其他 UFS LUN。
 
 关闭 Secure Boot 会使 Windows BitLocker 进入恢复流程。启用 BitLocker 的机器应先暂停保护并保存恢复密钥。
 

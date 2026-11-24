@@ -64,7 +64,7 @@ unpack_bootimg --boot_img "${product_out}/boot.img" --out "${work_dir}" >/dev/nu
 
 cmdline="androidboot.hardware=planck androidboot.boot_devices=soc@0/1d84000.ufshc androidboot.usbcontroller=a600000.usb androidboot.selinux=permissive androidboot.veritymode=disabled androidboot.flash.locked=0 androidboot.verifiedbootstate=orange firmware_class.path=/vendor/firmware/ init=/init printk.devkmsg=on deferred_probe_timeout=30 console=tty0 clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime"
 
-mkdir -p "${output%/*}"
+mkdir -p "$(dirname -- "${output}")"
 ukify build \
     --linux "${repo_root}/device/huawei/planck/prebuilt-boot/vmlinuz.efi" \
     --initrd "${work_dir}/ramdisk" \

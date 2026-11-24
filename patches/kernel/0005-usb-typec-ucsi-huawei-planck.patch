@@ -34,7 +34,7 @@ new file mode 100644
 index 000000000..2536805e3
 --- /dev/null
 +++ b/drivers/usb/typec/ucsi/ucsi_huawei_planck.c
-@@ -0,0 +1,366 @@
+@@ -0,0 +1,370 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Copyright (C) 2024-2025
@@ -263,6 +263,9 @@ index 000000000..2536805e3
 +	dev_dbg(ec_ucsi->ucsi->dev, "muxc: %d, ccst: %d, dppn: %d, hsfl: %d\n",
 +		data.muxc, data.ccst, data.dppn, data.hsfl);
 +
++	if (!ec_ucsi->ucsi || !ec_ucsi->ucsi->connector)
++		return;
++
 +	con = &ec_ucsi->ucsi->connector[0];
 +	if (con->port)
 +		typec_set_orientation(
@@ -295,7 +298,8 @@ index 000000000..2536805e3
 +
 +	case PLANCK_EC_UCSI_EVENT_HPD:
 +		planck_ec_ucsi_read_port_status(ec_ucsi);
-+		ucsi_connector_change(ec_ucsi->ucsi, 1);
++		if (ec_ucsi->ucsi && ec_ucsi->ucsi->connector)
++			ucsi_connector_change(ec_ucsi->ucsi, 1);
 +		break;
 +
 +	default:
@@ -319,7 +323,7 @@ index 000000000..2536805e3
 +	ec_ucsi->ec = ec;
 +	ec_ucsi->nb.notifier_call = planck_ec_ucsi_notify;
 +
-+	device_for_each_child_node_scoped(&adev->dev, fwnode) {
++	device_for_each_child_node_scoped(adev->dev.parent, fwnode) {
 +		if (!fwnode_name_eq(fwnode, "connector"))
 +			continue;
 +

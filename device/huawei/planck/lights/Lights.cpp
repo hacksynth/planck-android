@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -46,10 +47,14 @@ std::string FindBacklight() {
     }
 
     std::sort(names.begin(), names.end());
+    // PAK-AL09 exposes both EC backlight and eDP AUX backlight; prefer the EC
+    // backlight device when both are present.
+    const auto preferred = std::find(names.begin(), names.end(), "planck-ec-backlight");
+    const std::string& chosen = (preferred != names.end()) ? *preferred : names.front();
     if (names.size() > 1) {
-        LOG(WARNING) << names.size() << " backlights found, using " << names.front();
+        LOG(WARNING) << names.size() << " backlights found, using " << chosen;
     }
-    return std::string(kBacklightDir) + "/" + names.front();
+    return std::string(kBacklightDir) + "/" + chosen;
 }
 
 int ReadInt(const std::string& path, int fallback) {
@@ -72,17 +77,14 @@ uint32_t ToBrightness(int32_t color) {
 
 class Lights final : public BnLights {
   public:
-    Lights() : path_(FindBacklight()) {
-        if (!path_.empty()) {
-            max_brightness_ = ReadInt(path_ + "/max_brightness", 255);
-            if (max_brightness_ <= 0) {
-                max_brightness_ = 255;
-            }
-        }
+    Lights() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        EnsureBacklightLocked();
     }
 
     ndk::ScopedAStatus setLightState(int32_t id, const HwLightState& state) override {
-        if (id != kBacklightId || path_.empty()) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (id != kBacklightId || !EnsureBacklightLocked()) {
             return ndk::ScopedAStatus::ok();
         }
 
@@ -98,8 +100,9 @@ class Lights final : public BnLights {
     }
 
     ndk::ScopedAStatus getLights(std::vector<HwLight>* lights) override {
+        std::lock_guard<std::mutex> lock(mutex_);
         lights->clear();
-        if (!path_.empty()) {
+        if (EnsureBacklightLocked()) {
             HwLight light;
             light.id = kBacklightId;
             light.ordinal = 0;
@@ -110,8 +113,24 @@ class Lights final : public BnLights {
     }
 
   private:
+    bool EnsureBacklightLocked() {
+        if (!path_.empty()) {
+            return true;
+        }
+        path_ = FindBacklight();
+        if (path_.empty()) {
+            return false;
+        }
+        max_brightness_ = ReadInt(path_ + "/max_brightness", 255);
+        if (max_brightness_ <= 0) {
+            max_brightness_ = 255;
+        }
+        return true;
+    }
+
     static constexpr int32_t kBacklightId = 0;
-    const std::string path_;
+    std::mutex mutex_;
+    std::string path_;
     int max_brightness_ = 255;
 };
 

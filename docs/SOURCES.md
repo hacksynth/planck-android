@@ -21,7 +21,7 @@
 
 `patches/kernel/0002` 至 `0005` 来自 Planck 既有 Linux 移植，分别添加 EC 设备树、EC 驱动、电池驱动和 UCSI 驱动。源文件以 GPL-2.0-only 发布。
 
-`patch/kernel/0006` 是本仓库新增的 Android DTS 变体，只改变 USB DWC3 默认角色。
+`patches/kernel/0006` 是本仓库新增的 Android DTS 变体，只改变 USB DWC3 默认角色。
 
 固件不随仓库分发，也没有通过公开来源自动下载。设备所有者必须自行确认提取和再分发权限。
 

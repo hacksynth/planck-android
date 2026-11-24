@@ -1,0 +1,271 @@
+diff --git a/fs/pstore/blk.c b/fs/pstore/blk.c
+index 12070b6a7..912229ec1 100644
+--- a/fs/pstore/blk.c
++++ b/fs/pstore/blk.c
+@@ -18,6 +18,7 @@
+ #include <linux/file.h>
+ #include <linux/init_syscalls.h>
+ #include <linux/mount.h>
++#include <linux/workqueue.h>
+ 
+ static long kmsg_size = CONFIG_PSTORE_BLK_KMSG_SIZE;
+ module_param(kmsg_size, long, 0400);
+@@ -194,25 +195,99 @@ static ssize_t psblk_generic_blk_write(const char *buf, size_t bytes,
+ 		loff_t pos)
+ {
+ 	/* Console/Ftrace backend may handle buffer until flush dirty zones */
+-	if (in_interrupt() || irqs_disabled())
++	if (in_interrupt() || irqs_disabled() || in_atomic())
+ 		return -EBUSY;
+ 	return kernel_write(psblk_file, buf, bytes, &pos);
+ }
+ 
++struct psblk_uuidcmp {
++	const char *uuid;
++	int len;
++};
++
++static int psblk_match_dev_by_uuid(struct device *dev, const void *data)
++{
++	struct block_device *bdev = dev_to_bdev(dev);
++	const struct psblk_uuidcmp *cmp = data;
++
++	if (!bdev->bd_meta_info ||
++	    strncasecmp(cmp->uuid, bdev->bd_meta_info->uuid, cmp->len))
++		return 0;
++	return 1;
++}
++
++static int psblk_match_dev_by_label(struct device *dev, const void *data)
++{
++	struct block_device *bdev = dev_to_bdev(dev);
++	const char *label = data;
++
++	if (!bdev->bd_meta_info || strcmp(label, bdev->bd_meta_info->volname))
++		return 0;
++	return 1;
++}
++
++static int psblk_lookup_devt(const char *name, dev_t *devt)
++{
++	struct device *dev;
++
++	if (!strncmp(name, "PARTUUID=", 9)) {
++		struct psblk_uuidcmp cmp = {
++			.uuid = name + 9,
++			.len = strlen(name + 9),
++		};
++
++		if (!cmp.len)
++			return -EINVAL;
++		dev = class_find_device(&block_class, NULL, &cmp,
++					psblk_match_dev_by_uuid);
++		if (!dev)
++			return -ENODEV;
++		*devt = dev->devt;
++		put_device(dev);
++		return 0;
++	}
++	if (!strncmp(name, "PARTLABEL=", 10)) {
++		const char *label = name + 10;
++
++		if (!*label)
++			return -EINVAL;
++		dev = class_find_device(&block_class, NULL, label,
++					psblk_match_dev_by_label);
++		if (!dev)
++			return -ENODEV;
++		*devt = dev->devt;
++		put_device(dev);
++		return 0;
++	}
++	return lookup_bdev(name, devt);
++}
++
+ /*
+  * This takes its configuration only from the module parameters now.
+  */
+ static int __register_pstore_blk(struct pstore_device_info *dev,
+ 				 const char *devpath)
+ {
++	dev_t devt;
+ 	int ret = -ENODEV;
+ 
+ 	lockdep_assert_held(&pstore_blk_lock);
+ 
+-	psblk_file = filp_open(devpath, O_RDWR | O_DSYNC | O_NOATIME | O_EXCL, 0);
++	ret = psblk_lookup_devt(devpath, &devt);
++	if (ret == 0) {
++		psblk_file = bdev_file_open_by_dev(devt,
++						   BLK_OPEN_READ | BLK_OPEN_WRITE,
++						   NULL, NULL);
++		if (!IS_ERR(psblk_file))
++			psblk_file->f_flags |= O_DSYNC;
++	} else {
++		psblk_file = filp_open(devpath,
++				       O_RDWR | O_DSYNC | O_NOATIME | O_EXCL,
++				       0);
++	}
+ 	if (IS_ERR(psblk_file)) {
+ 		ret = PTR_ERR(psblk_file);
+-		pr_err("failed to open '%s': %d!\n", devpath, ret);
++		pr_debug("failed to open '%s': %d!\n", devpath, ret);
+ 		goto err;
+ 	}
+ 
+@@ -253,36 +328,7 @@ int pstore_blk_get_config(struct pstore_blk_config *info)
+ EXPORT_SYMBOL_GPL(pstore_blk_get_config);
+ 
+ 
+-#ifndef MODULE
+-static const char devname[] = "/dev/pstore-blk";
+-static __init const char *early_boot_devpath(const char *initial_devname)
+-{
+-	/*
+-	 * During early boot the real root file system hasn't been
+-	 * mounted yet, and no device nodes are present yet. Use the
+-	 * same scheme to find the device that we use for mounting
+-	 * the root file system.
+-	 */
+-	dev_t dev;
+-
+-	if (early_lookup_bdev(initial_devname, &dev)) {
+-		pr_err("failed to resolve '%s'!\n", initial_devname);
+-		return initial_devname;
+-	}
+-
+-	init_unlink(devname);
+-	init_mknod(devname, S_IFBLK | 0600, new_encode_dev(dev));
+-
+-	return devname;
+-}
+-#else
+-static inline const char *early_boot_devpath(const char *initial_devname)
+-{
+-	return initial_devname;
+-}
+-#endif
+-
+-static int __init __best_effort_init(void)
++static int __best_effort_init(void)
+ {
+ 	struct pstore_device_info *best_effort_dev;
+ 	int ret;
+@@ -304,8 +350,7 @@ static int __init __best_effort_init(void)
+ 	best_effort_dev->zone.read = psblk_generic_blk_read;
+ 	best_effort_dev->zone.write = psblk_generic_blk_write;
+ 
+-	ret = __register_pstore_blk(best_effort_dev,
+-				    early_boot_devpath(blkdev));
++	ret = __register_pstore_blk(best_effort_dev, blkdev);
+ 	if (ret)
+ 		kfree(best_effort_dev);
+ 	else
+@@ -315,6 +360,28 @@ static int __init __best_effort_init(void)
+ 	return ret;
+ }
+ 
++static int psblk_retry_count;
++static void psblk_retry_work_fn(struct work_struct *work);
++static DECLARE_DELAYED_WORK(psblk_retry_work, psblk_retry_work_fn);
++
++static void psblk_retry_work_fn(struct work_struct *work)
++{
++	int ret;
++
++	mutex_lock(&pstore_blk_lock);
++	if (psblk_file || pstore_device_info) {
++		mutex_unlock(&pstore_blk_lock);
++		return;
++	}
++	ret = __best_effort_init();
++	mutex_unlock(&pstore_blk_lock);
++
++	if (ret && ++psblk_retry_count < 120)
++		schedule_delayed_work(&psblk_retry_work, msecs_to_jiffies(500));
++	else if (ret)
++		pr_err("failed to attach '%s' after retries: %d\n", blkdev, ret);
++}
++
+ static void __exit __best_effort_exit(void)
+ {
+ 	/*
+@@ -341,12 +408,20 @@ static int __init pstore_blk_init(void)
+ 	ret = __best_effort_init();
+ 	mutex_unlock(&pstore_blk_lock);
+ 
++	if (ret && best_effort && blkdev[0]) {
++		pr_info("deferring attach of '%s' until block device appears\n",
++			blkdev);
++		schedule_delayed_work(&psblk_retry_work, msecs_to_jiffies(500));
++		return 0;
++	}
++
+ 	return ret;
+ }
+ late_initcall(pstore_blk_init);
+ 
+ static void __exit pstore_blk_exit(void)
+ {
++	cancel_delayed_work_sync(&psblk_retry_work);
+ 	mutex_lock(&pstore_blk_lock);
+ 	__best_effort_exit();
+ 	/* If we've been asked to unload, unregister any remaining device. */
+diff --git a/fs/pstore/zone.c b/fs/pstore/zone.c
+index a3b003f9a..6b840b61a 100644
+--- a/fs/pstore/zone.c
++++ b/fs/pstore/zone.c
+@@ -254,7 +254,7 @@ static int psz_zone_write(struct pstore_zone *zone,
+ 		return -ENOMSG;
+ 	atomic_set(&zone->dirty, true);
+ 	/* flush dirty zones nicely */
+-	if (wcnt == -EBUSY && !is_on_panic())
++	if ((wcnt == -EBUSY || flush_mode == FLUSH_NONE) && !is_on_panic())
+ 		schedule_delayed_work(&psz_cleaner, msecs_to_jiffies(500));
+ 	return -EBUSY;
+ }
+@@ -825,6 +825,8 @@ static int notrace psz_record_write(struct pstore_zone *zone,
+ {
+ 	size_t start, rem;
+ 	bool is_full_data = false;
++	enum psz_flush_mode mode = (zone == pstore_zone_cxt.cpsz) ?
++				   FLUSH_NONE : FLUSH_PART;
+ 	char *buf;
+ 	int cnt;
+ 
+@@ -844,7 +846,7 @@ static int notrace psz_record_write(struct pstore_zone *zone,
+ 	start = buffer_start(zone);
+ 	rem = zone->buffer_size - start;
+ 	if (unlikely(rem < cnt)) {
+-		psz_zone_write(zone, FLUSH_PART, buf, rem, start);
++		psz_zone_write(zone, mode, buf, rem, start);
+ 		buf += rem;
+ 		cnt -= rem;
+ 		start = 0;
+@@ -852,7 +854,7 @@ static int notrace psz_record_write(struct pstore_zone *zone,
+ 	}
+ 
+ 	atomic_set(&zone->buffer->start, cnt + start);
+-	psz_zone_write(zone, FLUSH_PART, buf, cnt, start);
++	psz_zone_write(zone, mode, buf, cnt, start);
+ 
+ 	/**
+ 	 * psz_zone_write will set datalen as start + cnt.
+@@ -864,7 +866,8 @@ static int notrace psz_record_write(struct pstore_zone *zone,
+ 	 */
+ 	if (is_full_data) {
+ 		atomic_set(&zone->buffer->datalen, zone->buffer_size);
+-		psz_zone_write(zone, FLUSH_META, NULL, 0, 0);
++		psz_zone_write(zone, mode == FLUSH_NONE ? FLUSH_NONE : FLUSH_META,
++			       NULL, 0, 0);
+ 	}
+ 	return 0;
+ }
+@@ -1408,6 +1411,7 @@ int register_pstore_zone(struct pstore_zone_info *info)
+ 	}
+ 	pr_cont("\n");
+ 
++	psz_recovery(cxt);
+ 	err = pstore_register(&cxt->pstore);
+ 	if (err) {
+ 		pr_err("registering with pstore failed\n");

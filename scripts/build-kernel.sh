@@ -82,19 +82,38 @@ done < <(find "${repo_root}/patches/kernel" -maxdepth 1 -name '*.patch' -print |
 required_config=(
     CONFIG_ANDROID_BINDER_IPC=y
     CONFIG_ANDROID_BINDERFS=y
+    'CONFIG_ANDROID_BINDER_DEVICES="binder,hwbinder,vndbinder"'
+    CONFIG_USERFAULTFD=y
     CONFIG_SECURITY_SELINUX=y
+    CONFIG_PSTORE_BLK=y
     CONFIG_CPUSETS_V1=y
     CONFIG_MEMCG_V1=y
     CONFIG_PM_WAKELOCKS=y
     CONFIG_DRM_MSM=y
     CONFIG_DRM_TI_SN65DSI86=y
+    CONFIG_SCSI_UFS_QCOM=y
+    CONFIG_PHY_QCOM_QMP_UFS=y
+    CONFIG_PHY_QCOM_QMP_COMBO=y
+    CONFIG_RESET_QCOM_PDC=y
+    CONFIG_POWER_RESET_QCOM_PON=y
     CONFIG_I2C_HID_OF=y
     CONFIG_EC_HUAWEI_PLANCK=y
     CONFIG_BATTERY_HUAWEI_PLANCK=y
     CONFIG_UCSI_HUAWEI_PLANCK=y
     CONFIG_ATH10K_SNOC=y
     CONFIG_BT_HCIUART_QCA=y
+    CONFIG_IP_MULTIPLE_TABLES=y
+    CONFIG_IPV6_MULTIPLE_TABLES=y
+    CONFIG_IP_NF_MANGLE=y
+    CONFIG_IP_NF_RAW=y
+    CONFIG_IP6_NF_MANGLE=y
+    CONFIG_IP6_NF_RAW=y
+    CONFIG_NETFILTER_NETLINK_LOG=y
+    CONFIG_NETFILTER_XT_TARGET_NFLOG=y
     CONFIG_NETFILTER_XT_MATCH_QUOTA2=y
+    CONFIG_NETFILTER_XT_MATCH_POLICY=y
+    CONFIG_NETFILTER_XT_TARGET_MARK=y
+    CONFIG_TUN=y
 )
 for expected in "${required_config[@]}"; do
     grep -Fxq "${expected}" "${out_dir}/.config" ||
@@ -119,6 +138,13 @@ install -m 0644 \
 if [[ ${PLANCK_BUILD_MODULES:-0} == 1 ]]; then
     find "${prebuilt_dir}/modules" -maxdepth 1 -type f -name '*.ko' -delete
     find "${out_dir}" -type f -name '*.ko' -exec cp -t "${prebuilt_dir}/modules" {} +
+fi
+
+android_root=${ANDROID_ROOT:-${repo_root}/.work/lineage}
+mirror_prebuilt="${android_root}/device/huawei/planck/prebuilt-boot"
+if [[ -d ${android_root}/device/huawei/planck && ! -L ${android_root}/device/huawei/planck ]]; then
+    command -v rsync >/dev/null 2>&1 &&
+        rsync -a --delete "${prebuilt_dir}/" "${mirror_prebuilt}/"
 fi
 
 printf '\nKernel artifacts written to %s\n' "${prebuilt_dir}"

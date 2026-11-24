@@ -49,13 +49,13 @@
 # 1. 通过 BFSU 镜像同步 LineageOS 23.2（默认并发为 4）
 bash scripts/bootstrap.sh
 
-# 2. 加载 40 GiB 的共享 ccache 与源码路径
+# 2. 加载共享 ccache 与源码路径（可通过 CCACHE_DIR 覆盖默认位置）
 source scripts/planck-env.sh
 
-# 3. 从现有 Linux 安装或 Windows 驱动资料导入本机固件
+# 3. 从现有 Linux 安装或 Windows 驱动资料导入本机固件（会自动同步到 .work/lineage 镜像）
 bash scripts/import-firmware.sh --source /path/to/firmware-root
 
-# 4. 使用 LineageOS 提供的 Clang 构建 v7.3.5 Planck 内核与 DTB
+# 4. 使用 LineageOS 提供的 Clang 构建 v7.3.5 Planck 内核与 DTB（会自动同步到 .work/lineage 镜像）
 #    需要构建全部外设模块时设置 PLANCK_BUILD_MODULES=1
 cd .work/lineage
 source build/envsetup.sh
@@ -66,7 +66,7 @@ breakfast lineage_planck-bp4a-userdebug
 m bacon superimage
 cd ../..
 
-# 6. 生成可直接由 UEFI 固件启动的 BOOTAA64.EFI，以及可选的 ESP 文件树
+# 6. 生成可直接由 UEFI 固件启动的 BOOTAA64.EFI（内部 UFS 启动可使用 debug 变体启用 USB-C adb）
 bash scripts/build-uki.sh \
   --product-out .work/lineage/out/target/product/planck \
   --variant debug \

@@ -11,6 +11,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/init.planck.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.planck.usb.rc \
     $(LOCAL_PATH)/init.planck.utils.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/init.planck.utils.rc \
     $(LOCAL_PATH)/ueventd.planck.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.rc \
+    $(LOCAL_PATH)/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
+    $(LOCAL_PATH)/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
     $(LOCAL_PATH)/audio/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
     $(LOCAL_PATH)/audio/primary_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/primary_audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
@@ -19,6 +21,7 @@ PRODUCT_COPY_FILES += \
     frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml
 
 $(call soong_config_set_bool,hardware_interfaces_audio,use_default_audio_effects_config,true)
+PRODUCT_PACKAGES += audio_effects_config.xml
 
 # Qualcomm firmware is imported out of tree because it may not be redistributable.
 # The helper expands to nothing when the directory only contains this file's README.
@@ -62,6 +65,7 @@ PRODUCT_VENDOR_PROPERTIES += \
     bluetooth.profile.opp.enabled=true
 
 # Graphics: mainline MSM KMS through minigbm and drm_hwcomposer.
+PRODUCT_REQUIRES_INSECURE_EXECMEM_FOR_SWIFTSHADER := true
 $(call soong_config_set,minigbm,platform,msm)
 PRODUCT_PACKAGES += \
     android.hardware.graphics.allocator-service.minigbm \
