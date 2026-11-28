@@ -1,0 +1,50 @@
+From: planck-android <planck-android@localhost>
+Subject: [PATCH] usb: dwc3: qcom: only check HS-PHY L2 state on host wakeup suspend
+
+During system suspend, dwc3_suspend_common() calls dwc3_core_exit() and powers
+off the HS-PHY whenever the controller is in peripheral mode or in host mode
+without device_may_wakeup(). Checking PWR_EVNT_LPM_IN_L2_MASK unconditionally
+in dwc3_qcom_suspend() therefore logs a spurious "port-1 HS-PHY not in L2"
+error on every suspend cycle.
+
+Gate the L2 state check on dwc3_qcom_is_host(qcom) && wakeup, matching the
+remote-wakeup interrupt enable condition in the same function.
+
+--- a/drivers/usb/dwc3/dwc3-qcom-legacy.c
++++ b/drivers/usb/dwc3/dwc3-qcom-legacy.c
+@@ -431,10 +431,12 @@
+ 	if (qcom->is_suspended)
+ 		return 0;
+ 
+-	for (i = 0; i < qcom->num_ports; i++) {
+-		val = readl(qcom->qscratch_base + pwr_evnt_irq_stat_reg[i]);
+-		if (!(val & PWR_EVNT_LPM_IN_L2_MASK))
+-			dev_err(qcom->dev, "port-%d HS-PHY not in L2\n", i + 1);
++	if (dwc3_qcom_is_host(qcom) && wakeup) {
++		for (i = 0; i < qcom->num_ports; i++) {
++			val = readl(qcom->qscratch_base + pwr_evnt_irq_stat_reg[i]);
++			if (!(val & PWR_EVNT_LPM_IN_L2_MASK))
++				dev_err(qcom->dev, "port-%d HS-PHY not in L2\n", i + 1);
++		}
+ 	}
+ 
+ 	for (i = qcom->num_clocks - 1; i >= 0; i--)
+--- a/drivers/usb/dwc3/dwc3-qcom.c
++++ b/drivers/usb/dwc3/dwc3-qcom.c
+@@ -343,10 +343,12 @@
+ 	if (qcom->is_suspended)
+ 		return 0;
+ 
+-	for (i = 0; i < qcom->num_ports; i++) {
+-		val = readl(qcom->qscratch_base + pwr_evnt_irq_stat_reg[i]);
+-		if (!(val & PWR_EVNT_LPM_IN_L2_MASK))
+-			dev_err(qcom->dev, "port-%d HS-PHY not in L2\n", i + 1);
++	if (dwc3_qcom_is_host(qcom) && wakeup) {
++		for (i = 0; i < qcom->num_ports; i++) {
++			val = readl(qcom->qscratch_base + pwr_evnt_irq_stat_reg[i]);
++			if (!(val & PWR_EVNT_LPM_IN_L2_MASK))
++				dev_err(qcom->dev, "port-%d HS-PHY not in L2\n", i + 1);
++		}
+ 	}
+ 	clk_bulk_disable_unprepare(qcom->num_clocks, qcom->clks);
+ 

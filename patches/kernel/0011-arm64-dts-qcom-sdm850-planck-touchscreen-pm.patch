@@ -1,0 +1,52 @@
+From: planck-android <planck-android@localhost>
+Subject: [PATCH] arm64: dts: qcom: sdm850-planck: wire Goodix touchscreen power, reset, and panel follower
+
+BIOS 1.16 DSDT (_SB.TSC1 / PEP0.LPXC) powers the Goodix GXTP7380 (27C6:0118)
+touchscreen from LDO28A (vreg_l28a_3p0) and LDO6A (vreg_l6a_1p8) with active-low
+reset on TLMM GPIO 99, and exposes no wake capability. Without regulator/reset
+sequencing, i2c_hid_core_pm_resume() fails with -EIO (-5) on every s2idle
+wakeup while the display is off.
+
+Switch the node to i2c_hid_of_goodix (goodix,gt7375p), wire the real supplies
+and reset GPIO, remove wakeup-source, and link it to the eDP panel via
+drm_panel_follower so it cleanly powers down/up with the display.
+
+--- a/arch/arm64/boot/dts/qcom/sdm850-huawei-matebook-e-2019.dts
++++ b/arch/arm64/boot/dts/qcom/sdm850-huawei-matebook-e-2019.dts
+@@ -489,16 +489,18 @@
+ 	status = "okay";
+ 
+ 	touchscreen: hid@5d {
+-		compatible = "hid-over-i2c";
++		compatible = "goodix,gt7375p";
+ 		reg = <0x5d>;
+-		hid-descr-addr = <0x1>;
+ 
+ 		interrupts-extended = <&tlmm 125 IRQ_TYPE_LEVEL_LOW>;
+ 
+-		pinctrl-0 = <&i2c5_hid_active>;
++		pinctrl-0 = <&i2c5_hid_active>, <&i2c5_hid_reset>;
+ 		pinctrl-names = "default";
+ 
+-		wakeup-source;
++		panel = <&panel>;
++		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
++		vdd-supply = <&vreg_l28a_3p0>;
++		mainboard-vddio-supply = <&vreg_l6a_1p8>;
+ 	};
+ };
+ 
+@@ -815,6 +817,13 @@
+ 		bias-pull-up;
+ 	};
+ 
++	i2c5_hid_reset: i2c5-hid-reset-state {
++		pins = "gpio99";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
+ 	ec_int_default: ec-int-default-state {
+ 		pins = "gpio40";
+ 		function = "gpio";
