@@ -94,6 +94,7 @@ PRODUCT_SOONG_NAMESPACES += \
     device/linaro/dragonboard
 PRODUCT_PACKAGES += \
     com.android.hardware.wifi \
+    NetworkStackPlanckOverlay \
     wpa_supplicant \
     wpa_cli \
     hostapd \
