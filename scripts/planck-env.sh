@@ -14,11 +14,7 @@ fi
 planck_root=$(cd -- "$(dirname -- "${planck_source}")/.." && pwd -P)
 
 if [[ -z ${CCACHE_DIR:-} ]]; then
-    if mountpoint -q /mnt/netac 2>/dev/null; then
-        planck_ccache_dir=/mnt/netac/ccache
-    else
-        planck_ccache_dir=${planck_root}/.work/ccache
-    fi
+    planck_ccache_dir=${HOME}/.cache/ccache
 else
     planck_ccache_dir=${CCACHE_DIR}
 fi

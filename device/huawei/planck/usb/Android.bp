@@ -1,0 +1,5 @@
+sh_binary {
+    name: "init.planck.usb.sh",
+    src: "init.planck.usb.sh",
+    vendor: true,
+}

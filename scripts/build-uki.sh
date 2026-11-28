@@ -50,9 +50,11 @@ ukify build --help 2>&1 | grep -q -- '--devicetree' ||
 case "${variant}" in
     debug)
         dtb=sdm850-huawei-planck-android.dtb
+        usb_opts="androidboot.usbcontroller=a600000.usb "
         ;;
     host)
         dtb=sdm850-huawei-matebook-e-2019.dtb
+        usb_opts=""
         ;;
 esac
 
@@ -62,7 +64,7 @@ trap 'rm -rf -- "${work_dir}"' EXIT
 unpack_bootimg --boot_img "${product_out}/boot.img" --out "${work_dir}" >/dev/null
 [[ -s ${work_dir}/ramdisk ]] || die "boot.img has no ramdisk"
 
-cmdline="androidboot.hardware=planck androidboot.boot_devices=soc@0/1d84000.ufshc androidboot.usbcontroller=a600000.usb androidboot.selinux=permissive androidboot.veritymode=disabled androidboot.flash.locked=0 androidboot.verifiedbootstate=orange firmware_class.path=/vendor/firmware/ init=/init printk.devkmsg=on deferred_probe_timeout=30 console=tty0 clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime"
+cmdline="androidboot.hardware=planck androidboot.boot_devices=soc@0/1d84000.ufshc ${usb_opts}androidboot.selinux=permissive androidboot.veritymode=disabled androidboot.flash.locked=0 androidboot.verifiedbootstate=orange firmware_class.path=/vendor/firmware/ init=/init printk.devkmsg=on deferred_probe_timeout=30 console=tty0 clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime"
 
 mkdir -p "$(dirname -- "${output}")"
 ukify build \

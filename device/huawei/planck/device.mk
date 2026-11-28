@@ -11,6 +11,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/init.planck.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.planck.usb.rc \
     $(LOCAL_PATH)/init.planck.utils.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/init.planck.utils.rc \
     $(LOCAL_PATH)/ueventd.planck.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.rc \
+    $(LOCAL_PATH)/wifi/wpa_supplicant.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant.conf \
     $(LOCAL_PATH)/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
     $(LOCAL_PATH)/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
     $(LOCAL_PATH)/audio/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
@@ -43,8 +44,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.sf.lcd_density=240 \
     ro.opengles.version=196610 \
     ro.hardware.gralloc=minigbm \
-    persist.graphics.egl=angle \
-    sys.usb.controller=a600000.usb
+    persist.graphics.egl=angle
 
 PRODUCT_VENDOR_PROPERTIES += \
     ro.hardware.egl=angle \
@@ -86,7 +86,8 @@ PRODUCT_PACKAGES += \
     com.android.hardware.audio \
     com.android.hardware.sensors \
     com.android.hardware.keymint.rust_nonsecure \
-    com.android.hardware.gatekeeper.nonsecure
+    com.android.hardware.gatekeeper.nonsecure \
+    init.planck.usb.sh
 
 # WCN3990 uses mainline ath10k and the AOSP nl80211 HAL.
 PRODUCT_SOONG_NAMESPACES += \
@@ -112,10 +113,14 @@ PRODUCT_PACKAGES += \
     rmtfs
 
 PRODUCT_COPY_FILES += \
+    frameworks/native/data/etc/tablet_core_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/tablet_core_hardware.xml \
+    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.jazzhand.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.jazzhand.xml \
     frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
+    frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
     frameworks/native/data/etc/android.hardware.bluetooth.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth.xml \
     frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
     frameworks/native/data/etc/android.hardware.usb.host.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.host.xml \
+    frameworks/native/data/etc/android.hardware.usb.accessory.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.accessory.xml \
     frameworks/native/data/etc/android.software.midi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.midi.xml \
     frameworks/native/data/etc/android.hardware.opengles.aep.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.opengles.aep.xml \
     frameworks/native/data/etc/android.hardware.vulkan.level-1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.level.xml \

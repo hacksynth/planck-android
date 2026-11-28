@@ -1,0 +1,12 @@
+type planck_usb_init, domain;
+type planck_usb_init_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(planck_usb_init);
+
+vendor_public_prop(vendor_usb_prop)
+set_prop(planck_usb_init, vendor_usb_prop)
+get_prop(vendor_init, vendor_usb_prop)
+
+allow planck_usb_init vendor_shell_exec:file rx_file_perms;
+allow planck_usb_init vendor_toolbox_exec:file rx_file_perms;
+allow planck_usb_init sysfs_udc:dir { open read search };
+allow planck_usb_init sysfs_udc:lnk_file { getattr read };

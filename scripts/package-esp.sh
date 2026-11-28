@@ -72,14 +72,14 @@ if [[ -n ${loader} ]]; then
     install -m 0644 "${loader}" "${output_dir}/EFI/BOOT/BOOTAA64.EFI"
 fi
 
-common_options="androidboot.hardware=planck androidboot.boot_devices=soc@0/1d84000.ufshc androidboot.usbcontroller=a600000.usb androidboot.selinux=permissive androidboot.veritymode=disabled androidboot.flash.locked=0 androidboot.verifiedbootstate=orange firmware_class.path=/vendor/firmware/ init=/init printk.devkmsg=on deferred_probe_timeout=30 console=tty0 clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime"
+common_options="androidboot.hardware=planck androidboot.boot_devices=soc@0/1d84000.ufshc androidboot.selinux=permissive androidboot.veritymode=disabled androidboot.flash.locked=0 androidboot.verifiedbootstate=orange firmware_class.path=/vendor/firmware/ init=/init printk.devkmsg=on deferred_probe_timeout=30 console=tty0 clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime"
 
 cat >"${output_dir}/loader/entries/planck-debug.conf" <<EOF
 title Android / LineageOS (USB adb)
 linux /EFI/planck/vmlinuz.efi
 initrd /EFI/planck/initramfs.img
 devicetree /EFI/planck/planck.dtb
-options ${common_options}
+options androidboot.usbcontroller=a600000.usb ${common_options}
 EOF
 
 cat >"${output_dir}/loader/entries/planck-host.conf" <<EOF

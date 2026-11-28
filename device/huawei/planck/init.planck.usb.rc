@@ -1,4 +1,14 @@
+service planck_set_udc /vendor/bin/init.planck.usb.sh
+    class core
+    user root
+    group system
+    disabled
+    oneshot
+
 on boot
+    start planck_set_udc
+
+on property:vendor.usb.controller=*
     mkdir /config/usb_gadget/g1 0770 shell shell
     mkdir /config/usb_gadget/g1/strings/0x409 0770 shell shell
     write /config/usb_gadget/g1/idVendor 0x18d1
@@ -25,6 +35,7 @@ on boot
     symlink /config/usb_gadget/g1/configs/b.1 /config/usb_gadget/g1/os_desc/b.1
     setprop sys.usb.mtp.device_type 3
     setprop sys.usb.ffs.aio_compat 1
+    setprop sys.usb.controller ${vendor.usb.controller}
     setprop sys.usb.configfs 1
 
 # Imported before /system/etc/init/hw/init.usb.configfs.rc. Only set board

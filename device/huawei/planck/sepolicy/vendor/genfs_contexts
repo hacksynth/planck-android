@@ -1,6 +1,11 @@
-# AOSP provides hal_light_default access to sysfs_leds. Label the backlight
-# class node so the Planck lights HAL can enumerate and write brightness.
+# AOSP provides hal_light_default access to sysfs_leds and hal_health_default
+# access to sysfs_batteryinfo. Label both class and backing platform device nodes.
 genfscon sysfs /class/backlight u:object_r:sysfs_leds:s0
+genfscon sysfs /devices/platform/soc@0/8c0000.geniqup/89c000.i2c/i2c-7/7-0076/backlight u:object_r:sysfs_leds:s0
+genfscon sysfs /devices/platform/soc@0/8c0000.geniqup/89c000.i2c/i2c-7/7-0076/huawei_planck_ec.psy.0/power_supply u:object_r:sysfs_batteryinfo:s0
+genfscon sysfs /devices/platform/soc@0/ae00000.mdss u:object_r:sysfs_gpu:s0
+genfscon sysfs /devices/platform/soc@0/ae00000.display-subsystem u:object_r:sysfs_gpu:s0
+genfscon sysfs /devices/platform/soc@0/8804000.mmc/mmc_host/mmc0 u:object_r:sysfs_devices_block:s0
 genfscon sysfs /class/rmtfs u:object_r:sysfs_rmtfs:s0
 genfscon sysfs /devices/platform/97c00000.rmtfs u:object_r:sysfs_rmtfs:s0
 genfscon sysfs /devices/platform/reserved-memory/97c00000.rmtfs u:object_r:sysfs_rmtfs:s0
