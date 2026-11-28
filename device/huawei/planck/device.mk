@@ -48,7 +48,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 PRODUCT_VENDOR_PROPERTIES += \
     ro.hardware.egl=angle \
-    ro.hardware.vulkan=pastel \
+    ro.hardware.vulkan=freedreno \
     ro.hw_timeout_multiplier=3 \
     ro.egl.blobcache.multifile=true \
     ro.surface_flinger.max_frame_buffer_acquired_buffers=3 \
@@ -64,8 +64,7 @@ PRODUCT_VENDOR_PROPERTIES += \
     bluetooth.profile.hid.device.enabled=true \
     bluetooth.profile.opp.enabled=true
 
-# Graphics: mainline MSM KMS through minigbm and drm_hwcomposer.
-PRODUCT_REQUIRES_INSECURE_EXECMEM_FOR_SWIFTSHADER := true
+# Graphics: mainline MSM KMS through minigbm, drm_hwcomposer, ANGLE, and Mesa Turnip.
 $(call soong_config_set,minigbm,platform,msm)
 PRODUCT_PACKAGES += \
     android.hardware.graphics.allocator-service.minigbm \
@@ -74,7 +73,7 @@ PRODUCT_PACKAGES += \
     libEGL_angle \
     libGLESv1_CM_angle \
     libGLESv2_angle \
-    vulkan.pastel
+    vulkan.freedreno
 
 # Core Android services. These are software-backed where Planck has no Android
 # vendor BSP. The health example reads Linux power_supply and therefore sees the
@@ -125,7 +124,7 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.hardware.opengles.aep.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.opengles.aep.xml \
     frameworks/native/data/etc/android.hardware.vulkan.level-1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.level.xml \
     frameworks/native/data/etc/android.hardware.vulkan.compute-0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.compute.xml \
-    frameworks/native/data/etc/android.hardware.vulkan.version-1_1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version.xml
+    frameworks/native/data/etc/android.hardware.vulkan.version-1_3.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version.xml
 
 # Do not install a thermal HAL until Planck thresholds are based on its own
 # thermal zones. AOSP's example HAL reports shutdown thresholds that are unsafe

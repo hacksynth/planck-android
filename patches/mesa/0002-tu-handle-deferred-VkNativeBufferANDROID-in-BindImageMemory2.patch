@@ -1,0 +1,94 @@
+From: planck-android <planck-android@localhost>
+Subject: [PATCH] tu: handle deferred VkNativeBufferANDROID in tu_BindImageMemory2
+
+Android 16 libvulkan implements VK_EXT_swapchain_maintenance1 deferred memory
+allocation (VK_SWAPCHAIN_CREATE_DEFERRED_MEMORY_ALLOCATION_BIT_EXT) by
+creating unbound VkImages in vkCreateSwapchainKHR and later calling
+vkBindImageMemory2 in vkAcquireNextImageKHR with memory == VK_NULL_HANDLE and
+VkNativeBufferANDROID chained in pNext.
+
+Turnip previously hit UNREACHABLE("VkBindImageMemoryInfo with no memory") in
+release builds, which compiled out the null check and crashed with SIGSEGV at
+offset 0x70 on every ANGLE/HWUI app window surface.
+
+Resolve the gralloc layout from VkNativeBufferANDROID, recompute the image
+layout, and import/bind the dma-buf via vk_android_import_anb.
+
+--- a/src/freedreno/vulkan/tu_image.cc
++++ b/src/freedreno/vulkan/tu_image.cc
+@@ -913,10 +913,61 @@
+       VK_FROM_HANDLE(tu_image, image, pBindInfos[i].image);
+       VK_FROM_HANDLE(tu_device_memory, mem, pBindInfos[i].memory);
+ 
++      const VkBindMemoryStatusKHR *status =
++         vk_find_struct_const(pBindInfos[i].pNext, BIND_MEMORY_STATUS_KHR);
++      if (status)
++         *status->pResult = VK_SUCCESS;
++
+       if (!mem) {
+ #if DETECT_OS_ANDROID
+-         /* TODO handle VkNativeBufferANDROID */
+-         UNREACHABLE("VkBindImageMemoryInfo with no memory");
++         const VkNativeBufferANDROID *anb =
++            vk_find_struct_const(pBindInfos[i].pNext, NATIVE_BUFFER_ANDROID);
++         if (!anb || !anb->handle) {
++            VkResult result = vk_error(device, VK_ERROR_INVALID_EXTERNAL_HANDLE);
++            if (status)
++               *status->pResult = result;
++            return result;
++         }
++
++         VkImageCreateInfo anb_ci = {};
++         anb_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
++         anb_ci.pNext = anb;
++
++         VkImageDrmFormatModifierExplicitCreateInfoEXT eci;
++         VkSubresourceLayout a_plane_layouts[TU_MAX_PLANE_COUNT];
++         VkResult result = vk_android_get_anb_layout(
++            &anb_ci, &eci, a_plane_layouts, TU_MAX_PLANE_COUNT);
++         if (result != VK_SUCCESS) {
++            if (status)
++               *status->pResult = result;
++            return result;
++         }
++
++         image->vk.android_buffer_type = ANDROID_BUFFER_NATIVE;
++         image->total_size = 0;
++         memset(image->layout, 0, sizeof(image->layout));
++         result = TU_CALLX(device, tu_image_update_layout)(
++            device, image, eci.drmFormatModifier, a_plane_layouts);
++         if (result != VK_SUCCESS) {
++            if (status)
++               *status->pResult = result;
++            return result;
++         }
++
++         if (image->vk.anb_memory) {
++            device->vk.dispatch_table.FreeMemory(_device, image->vk.anb_memory,
++                                                 NULL);
++            image->vk.anb_memory = VK_NULL_HANDLE;
++         }
++
++         result = vk_android_import_anb(&device->vk, &anb_ci, NULL, &image->vk);
++         if (result != VK_SUCCESS) {
++            if (status)
++               *status->pResult = result;
++            return result;
++         }
++
++         continue;
+ #else
+          const VkBindImageMemorySwapchainInfoKHR *swapchain_info =
+             vk_find_struct_const(pBindInfos[i].pNext,
+@@ -928,11 +979,6 @@
+ #endif
+       }
+ 
+-      const VkBindMemoryStatusKHR *status =
+-         vk_find_struct_const(pBindInfos[i].pNext, BIND_MEMORY_STATUS_KHR);
+-      if (status)
+-         *status->pResult = VK_SUCCESS;
+-
+       assert(mem);
+       VkResult result;
+       if (vk_image_is_android_hardware_buffer(&image->vk)) {

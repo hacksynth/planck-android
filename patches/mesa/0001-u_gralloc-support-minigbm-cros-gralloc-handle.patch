@@ -1,0 +1,77 @@
+From: planck-android <planck-android@localhost>
+Subject: [PATCH] u_gralloc: read minigbm cros_gralloc_handle metadata in fallback gralloc
+
+Android 16 minigbm uses IMapper 5 (mapper.minigbm.so) without legacy gralloc0
+perform callbacks, and out-of-tree Turnip builds cannot link against private
+system libui.so. Recognize minigbm's packed cros_gralloc_handle directly in
+u_gralloc_fallback so Turnip gets the exact DRM fourcc, format modifier
+(linear vs UBWC), plane count, strides, offsets, and dma-buf FDs.
+
+--- a/src/util/u_gralloc/u_gralloc_fallback.c
++++ b/src/util/u_gralloc/u_gralloc_fallback.c
+@@ -16,8 +16,37 @@
+ 
+ #include <dlfcn.h>
+ #include <errno.h>
++#include <stdint.h>
+ #include <string.h>
+ 
++#define PLANCK_CROS_GRALLOC_MAGIC 0xABCDDCBAu
++#define PLANCK_DRV_MAX_PLANES 4
++#define PLANCK_DRV_MAX_FDS (PLANCK_DRV_MAX_PLANES + 1)
++
++struct planck_cros_gralloc_handle {
++   int version;
++   int numFds;
++   int numInts;
++   int32_t fds[PLANCK_DRV_MAX_FDS];
++   uint32_t strides[PLANCK_DRV_MAX_PLANES];
++   uint32_t offsets[PLANCK_DRV_MAX_PLANES];
++   uint32_t sizes[PLANCK_DRV_MAX_PLANES];
++   uint32_t id;
++   uint32_t width;
++   uint32_t height;
++   uint32_t format;
++   uint32_t tiling;
++   uint64_t format_modifier;
++   uint64_t use_flags;
++   uint32_t magic;
++   uint32_t pixel_stride;
++   int32_t droid_format;
++   int64_t usage;
++   uint32_t num_planes;
++   uint64_t reserved_region_size;
++   uint64_t total_size;
++} __attribute__((packed));
++
+ struct fallback_gralloc {
+    struct u_gralloc base;
+    gralloc_module_t *gralloc_module;
+@@ -109,6 +138,27 @@
+    if (hnd->handle->numFds == 0)
+       return -EINVAL;
+ 
++   if (sizeof(native_handle_t) +
++          sizeof(int) * (hnd->handle->numFds + hnd->handle->numInts) ==
++       sizeof(struct planck_cros_gralloc_handle)) {
++      const struct planck_cros_gralloc_handle *cros =
++         (const struct planck_cros_gralloc_handle *)hnd->handle;
++      if (cros->magic == PLANCK_CROS_GRALLOC_MAGIC &&
++          cros->num_planes > 0 && cros->num_planes <= PLANCK_DRV_MAX_PLANES &&
++          (uint32_t)hnd->handle->numFds ==
++             cros->num_planes + (cros->reserved_region_size > 0 ? 1u : 0u)) {
++         out->drm_fourcc = cros->format;
++         out->modifier = cros->format_modifier;
++         out->num_planes = cros->num_planes;
++         for (uint32_t i = 0; i < cros->num_planes; i++) {
++            out->fds[i] = cros->fds[i];
++            out->strides[i] = cros->strides[i];
++            out->offsets[i] = cros->offsets[i];
++         }
++         return 0;
++      }
++   }
++
+    if (is_hal_format_yuv(hnd->hal_format)) {
+       int ret = fallback_gralloc_get_yuv_info(gralloc, hnd, out);
+       /*

@@ -7,6 +7,8 @@
 /device/huawei/planck/prebuilt-boot/vmlinuz.efi
 /device/huawei/planck/prebuilt-boot/dtb/*.dtb
 /device/huawei/planck/prebuilt-boot/modules/*.ko
+/device/huawei/planck/prebuilt-mesa/arm64/*.so
+/device/huawei/planck/prebuilt-mesa/arm/*.so
 
 # Firmware is device-specific and may not be redistributable.
 /device/huawei/planck/firmware/**/*

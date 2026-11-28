@@ -1,0 +1,30 @@
+cc_prebuilt_library_shared {
+    name: "vulkan.freedreno",
+    vendor: true,
+    relative_install_path: "hw",
+    strip: {
+        none: true,
+    },
+    check_elf_files: false,
+    compile_multilib: "both",
+    arch: {
+        arm64: {
+            srcs: ["arm64/vulkan.freedreno.so"],
+        },
+        arm: {
+            srcs: ["arm/vulkan.freedreno.so"],
+        },
+    },
+    shared_libs: [
+        "libc",
+        "libcutils",
+        "libdl",
+        "libdrm",
+        "libhardware",
+        "liblog",
+        "libm",
+        "libnativewindow",
+        "libsync",
+        "libz",
+    ],
+}

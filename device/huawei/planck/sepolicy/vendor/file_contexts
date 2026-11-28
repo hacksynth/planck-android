@@ -27,4 +27,5 @@
 /vendor/bin/rmtfs u:object_r:rmtfs_exec:s0
 /vendor/bin/tqftpserv u:object_r:tqftpserv_exec:s0
 /vendor/bin/hw/android\.hardware\.light-service\.planck u:object_r:hal_light_default_exec:s0
+/vendor/lib(64)?/hw/vulkan\.freedreno\.so u:object_r:same_process_hal_file:s0
 /vendor/lib(64)?/hw/vulkan\.pastel\.so u:object_r:same_process_hal_file:s0
